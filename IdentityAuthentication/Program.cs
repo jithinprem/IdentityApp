@@ -1,8 +1,11 @@
+using System.Text;
 using IdentityAuthentication.Data;
 using IdentityAuthentication.Models;
 using IdentityAuthentication.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,6 +40,18 @@ builder.Services.AddIdentityCore<User>(options =>
     .AddUserManager<UserManager<User>>() // be able to create tokens for email confirmation
     .AddDefaultTokenProviders(); // be able to create tokens for email confirmation
 
+// to be able to authenticate our user using JWT
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true, // we are going to validate token based on the key
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JWT:key"])), // same key we used to encrypt for JWTService createJWT
+            ValidateIssuer = true, 
+            ValidateAudience = false // do not validate the audience (angular side)
+        };
+    });
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -47,6 +62,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseRouting();
 app.MapControllers();
 app.Run();
