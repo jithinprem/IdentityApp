@@ -49,9 +49,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true, // we are going to validate token based on the key
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JWT:key"])), // same key we used to encrypt for JWTService createJWT
             ValidateIssuer = true, 
-            ValidateAudience = false // do not validate the audience (angular side)
+            ValidateAudience = false, // do not validate the audience (angular side)
+            ValidIssuer = builder.Configuration["JWT:Issuer"]
         };
     });
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -62,8 +65,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseRouting();
 app.MapControllers();
 app.Run();

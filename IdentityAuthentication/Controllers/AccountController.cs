@@ -1,6 +1,8 @@
-﻿using IdentityAuthentication.DTOs;
+﻿using System.Security.Claims;
+using IdentityAuthentication.DTOs;
 using IdentityAuthentication.Models;
 using IdentityAuthentication.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +25,14 @@ public class AccountController : Controller
         _jwtService = jwtService;
         _userManager = userManager;
         _signInManager = signInManager;
+    }
+
+    [Authorize]
+    [HttpGet("refresh-user-token")]
+    public async Task<ActionResult<UserDto>> RefreshUserToken()
+    {
+        var user = await _userManager.FindByNameAsync(User.FindFirst(ClaimTypes.Email)?.Value);
+        return CreateApplicationUserDto(user);
     }
 
     [HttpPost("login")]
