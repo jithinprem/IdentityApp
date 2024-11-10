@@ -2,6 +2,7 @@
 using System.Security.Claims;
 using System.Text;
 using IdentityAuthentication.Models;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 
 namespace IdentityAuthentication.Services;
@@ -10,15 +11,16 @@ public class JWTService
 {
     private readonly IConfiguration _configuration;
     private readonly SymmetricSecurityKey _jwtKey;
-    
-    public JWTService(IConfiguration configuration)
+    private readonly UserManager<User> _userManager;
+    public JWTService(IConfiguration configuration, UserManager<User> userManager)
     {
         _configuration = configuration;
         // jwtKey is used for encrypting and decrypting tokens
         _jwtKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT:Key"]));
+        _userManager = userManager;
     }
 
-    public string CreateJWT(User user)
+    public async Task<string> CreateJWT(User user)
     {
         var userClaims = new List<Claim>
         {
@@ -27,6 +29,9 @@ public class JWTService
             new Claim(ClaimTypes.GivenName, user.FirstName),
             new Claim(ClaimTypes.Surname, user.LastName)
         };
+
+        var roles = await _userManager.GetRolesAsync(user);
+        userClaims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
         var credentials = new SigningCredentials(_jwtKey, SecurityAlgorithms.HmacSha256Signature);
         var tokenDescriptor = new SecurityTokenDescriptor

@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using System.Text;
+using IdentityAuthentication;
 using IdentityAuthentication.Data;
 using IdentityAuthentication.Models;
 using IdentityAuthentication.Services;
@@ -22,6 +24,7 @@ builder.Services.AddDbContext<Context>(options =>
 
 builder.Services.AddScoped<JWTService>();
 builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<ContextSeedService>();
 
 builder.Services.AddIdentityCore<User>(options =>
     {
@@ -75,6 +78,24 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
     };
 });
 
+builder.Services.AddAuthorization(opt =>
+{
+    opt.AddPolicy("AdminPolicy", policy => policy.RequireRole("Admin"));
+    opt.AddPolicy("ManagerPolicy", policy => policy.RequireRole("Manager"));
+    opt.AddPolicy("PlayerPolicy", policy => policy.RequireRole("Player"));
+    
+    opt.AddPolicy("AdminOrManagerPolicy", policy => policy.RequireRole("Admin", "Manager"));
+    opt.AddPolicy("AdminAndManagerPolicy", policy => policy.RequireRole("Admin").RequireRole("Manager"));
+    opt.AddPolicy("AnyRolePolicy", policy => policy.RequireRole("Admin", "Manager", "Player"));
+    
+    opt.AddPolicy("AdminEmailPolicy", policy => policy.RequireClaim(ClaimTypes.Email, "admin@example.com"));
+    opt.AddPolicy("JacksonSurNamePolicy", policy => policy.RequireClaim(ClaimTypes.Surname, "jackson"));
+    
+    opt.AddPolicy("ManagerEmailAndJacksonSurnamePolicy", policy => policy.RequireClaim(ClaimTypes.Surname, "jackson")
+        .RequireClaim(ClaimTypes.Email, "admin@example.com"));
+    opt.AddPolicy("VIPPolicy", policy => policy.RequireAssertion(context => SD.VIPPolicy(context)));
+});
+
 var app = builder.Build();
 app.Use(async (HttpContext context, Func<Task> next) =>
 {   // dummy middleware to check TODO: delete
@@ -98,4 +119,21 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+#region ContextSeed
+
+using var scope = app.Services.CreateScope();
+try
+{
+    var contextSeedService = scope.ServiceProvider.GetService<ContextSeedService>();
+    await contextSeedService.InitializeContextAsync();
+}
+catch (Exception ex)
+{
+    var logger = scope.ServiceProvider.GetService<ILogger<Program>>();
+    logger.LogError(ex.Message, "Failed to initialize seed database");
+}
+
+#endregion
+
 app.Run();

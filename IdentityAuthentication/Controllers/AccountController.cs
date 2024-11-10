@@ -43,7 +43,7 @@ public class AccountController : Controller
     public async Task<ActionResult<UserDto>> RefreshUserToken()
     {
         var user = await _userManager.FindByNameAsync(User.FindFirst(ClaimTypes.Email)?.Value);
-        return CreateApplicationUserDto(user);
+        return await CreateApplicationUserDto(user);
     }
 
     [HttpPost("login")]
@@ -54,8 +54,33 @@ public class AccountController : Controller
         if (user.EmailConfirmed == false) return Unauthorized("please confirm your email.");
 
         var result = await _signInManager.CheckPasswordSignInAsync(user, model.Password, false);
-        if (!result.Succeeded) return Unauthorized("Invalid username or password");
-        return CreateApplicationUserDto(user);
+
+        if (result.IsLockedOut) 
+            return Unauthorized(string.Format("Your account has been locked. You should wait until {0} (UTC time) to be able to login", user.LockoutEnd));
+
+        if (!result.Succeeded)
+        {
+            if (!user.UserName.Equals(SD.AdminUserName))
+            {
+                // incrementing AccessFailedCount of the AspNetUser by 1
+                await _userManager.AccessFailedAsync(user);
+            }
+
+            if (user.AccessFailedCount >= SD.MaximumLoginAttempts)
+            {
+                // lock the user for one day
+                await _userManager.SetLockoutEndDateAsync(user, DateTime.UtcNow.AddDays(1));
+                return Unauthorized(string.Format(
+                    "Your account has been locked. You should wait until {0} (utc time) to be able to login",
+                    user.LockoutEnd));
+            }
+            return Unauthorized("Invalid username or password");
+        }
+
+        await _userManager.ResetAccessFailedCountAsync(user);
+        await _userManager.SetLockoutEndDateAsync(user, null);
+        
+        return await CreateApplicationUserDto(user);
     }
 
     [HttpPost("login-with-third-party")]
@@ -97,7 +122,7 @@ public class AccountController : Controller
         var user = await _userManager.Users.FirstOrDefaultAsync(x =>
             x.UserName == model.UserId && x.Provider == model.Provider);
         if (user == null) return Unauthorized("Unable to find your account");
-        return CreateApplicationUserDto(user);
+        return await CreateApplicationUserDto(user);
     }
 
     [HttpPost("register")]
@@ -117,6 +142,7 @@ public class AccountController : Controller
         };
         var result = await _userManager.CreateAsync(userToAdd, model.Password);
         if (!result.Succeeded) return BadRequest(result.Errors);
+        await _userManager.AddToRoleAsync(userToAdd, SD.PlayerRole);
 
         try
         {
@@ -183,8 +209,9 @@ public class AccountController : Controller
         };
         var result = await _userManager.CreateAsync(userToAdd);
         if (!result.Succeeded) return BadRequest(result.Errors);
-
-        return CreateApplicationUserDto(userToAdd);
+        await _userManager.AddToRoleAsync(userToAdd, SD.PlayerRole);
+        
+        return await CreateApplicationUserDto(userToAdd);
     }
 
     [HttpPut("confirm-email")]
@@ -328,13 +355,13 @@ public class AccountController : Controller
         return await _userManager.Users.AnyAsync(x => x.Email == email.ToLower());
     }
 
-    private UserDto CreateApplicationUserDto(User user)
+    private async Task<UserDto> CreateApplicationUserDto(User user)
     {
         return new UserDto
         {
             FirstName = user.FirstName,
             LastName = user.LastName,
-            JWT = _jwtService.CreateJWT(user)
+            JWT = await _jwtService.CreateJWT(user)
         };
     }
 

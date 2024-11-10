@@ -11,5 +11,5 @@ public class User: IdentityUser
     [Required]
     public string LastName { get; set; }
     public DateTime DateCreated { get; set; } = DateTime.UtcNow;
-    public string Provider { get; set; }
+    public string? Provider { get; set; }
 }
