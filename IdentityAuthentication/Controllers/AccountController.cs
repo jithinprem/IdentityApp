@@ -42,7 +42,12 @@ public class AccountController : Controller
     [HttpGet("refresh-user-token")]
     public async Task<ActionResult<UserDto>> RefreshUserToken()
     {
+        
         var user = await _userManager.FindByNameAsync(User.FindFirst(ClaimTypes.Email)?.Value);
+        if (await  _userManager.IsLockedOutAsync(user))
+        {
+            return Unauthorized("you have been locked out");
+        }
         return await CreateApplicationUserDto(user);
     }
 

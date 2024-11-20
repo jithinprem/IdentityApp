@@ -118,7 +118,13 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
+
+// is going to look for index.html and serving our api application using index.html
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.MapControllers();
+app.MapFallbackToController("Index", "Fallback");
 
 #region ContextSeed
 

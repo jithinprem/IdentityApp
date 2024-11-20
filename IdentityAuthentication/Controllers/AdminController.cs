@@ -105,6 +105,7 @@ public class AdminController: Controller
                 Id = member.Id,
                 FirstName = member.FirstName,
                 LastName = member.LastName,
+                UserName = member.UserName,
                 Roles = string.Join(",", _userManager.GetRolesAsync(member).GetAwaiter().GetResult())
                 
             }).FirstOrDefaultAsync();
